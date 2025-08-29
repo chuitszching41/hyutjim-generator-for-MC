@@ -1,0 +1,7 @@
+services:
+  - type: static
+    name: clocktower-tool
+    env: static
+    buildCommand: ""
+    staticPublishPath: .
+    pullRequestPreviewsEnabled: true
