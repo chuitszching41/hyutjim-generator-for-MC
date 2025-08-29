@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>血染鐘樓</title>
+  <style>
+    body { font-family: Arial; max-width: 900px; margin: auto; padding: 2em; }
+    textarea, input[type='number'] { width: 100%; margin-bottom: 1em; padding: 0.5em; }
+    button { padding: 0.5em 1em; margin: 1em 0; }
+    .role-option { display: flex; align-items: center; margin-bottom: 4px; }
+    .role-option input[type='checkbox'] { margin-right: 5px; }
+    .view { display: none; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1em; }
+    th, td { border: 1px solid #ccc; padding: 0.5em; text-align: center; }
+    .townsfolk { background-color: #d4ebf2; }
+    .outsider { background-color: #fff4cc; }
+    .evil { background-color: #f9d1d1; }
+    body { font-family: Arial; max-width: 900px; margin: auto; padding: 2em; }
+    textarea, input[type='number'] { width: 100%; margin-bottom: 1em; padding: 0.5em; }
+    button { padding: 0.5em 1em; margin: 1em 0; }
+    .role-option {
+        display: grid;
+        grid-template-columns: 1fr auto auto auto;
+        align-items: center;
+        gap: 0.5em;
+        margin-bottom: 4px;
+        white-space: nowrap;
+        }
+    .role-name.townsfolk { color: #0074D9; font-weight: bold; }
+    .role-name.outsider { color: #FFB800; font-weight: bold; }
+    .role-name.evil { color: #D10000; font-weight: bold; }
+    .role-option input[type='checkbox'] { margin-right: 5px; }
+    .role-list-container {
+        display: flex;
+        gap: 1em;
+        margin-bottom: 1em;
+        justify-content: space-between;
+        }
+        
+        
+    .category-column {
+        flex: 1;
+        min-width: 280px;
+        border: 1px solid #ccc;
+        padding: 1em;
+    }
+    .category-column h4 { margin-top: 0; }
+    .view { display: none; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1em; }
+    th, td { border: 1px solid #ccc; padding: 0.5em; text-align: center; }
+    .townsfolk { background-color: #d4ebf2; }
+    .outsider { background-color: #fff4cc; }
+    .evil { background-color: #f9d1d1; }
+  </style>
+</head>
+<body>
+  <h1>🩸 血染鐘樓 MC 角色抽取及分配 Generator</h1>
+
+  <h3>🔢 玩家數目</h3>
+  <input type="number" id="playerCount" min="1" value="6" />
+
+  <h3>👥 玩家名稱 (每行一個)</h3>
+  <textarea id="players" placeholder="Enter one player per line"></textarea>
+
+  <h3>🎭 角色</h3>
+  <div class="role-list-container" id="role-list"></div>
+
+  <button onclick="generate()">🔀 Draw Roles & Assign Seats</button>
+  <br>
+  <label><input type="radio" name="view" value="mc" checked onchange="switchView()"> MC View (with roles)</label>
+  <label><input type="radio" name="view" value="player" onchange="switchView()"> Player View (no roles)</label>
+
+  <div id="mc-view" class="view">
+    <h2>📋 MC View</h2>
+    <table>
+      <thead><tr><th>Seat</th><th>Player</th><th>Role</th></tr></thead>
+      <tbody id="mc-table"></tbody>
+      <div id="bluff-box" style="margin-top:12px;"></div>
+
+    </table>
+  </div>
+
+  <div id="player-view" class="view">
+    <h2>🪑 Player View</h2>
+    <table>
+      <thead><tr><th>Seat</th><th>Player</th></tr></thead>
+      <tbody id="player-table"></tbody>
+    </table>
+  </div>
+
+<script>
+// roles with their categories
+// roles with their categories + roleType
+const roles = [
+  // 👇 壞人：爪牙
+  { name: "間諜",       category: "evil", roleType: "minion" },
+  { name: "投毒者",     category: "evil", roleType: "minion" },
+  { name: "紅唇女郎(蕩婦)", category: "evil", roleType: "minion" },
+  { name: "男爵",       category: "evil", roleType: "minion" },
+
+  // 👇 壞人：惡魔
+  { name: "小惡魔",     category: "evil", roleType: "demon" },
+
+  // 👇 外來者 (outsider)
+  { name: "聖徒", category: "outsider", roleType: "outsider" },
+  { name: "隱士", category: "outsider", roleType: "outsider" },
+  { name: "管家", category: "outsider", roleType: "outsider" },
+  { name: "酒鬼", category: "outsider", roleType: "outsider", isDrunk: true },
+
+  // 👇 鎮民 (townsfolk)
+  { name: "洗衣婦",     category: "townsfolk", roleType: "townsfolk" },
+  { name: "圖書管理員", category: "townsfolk", roleType: "townsfolk" },
+  { name: "調查員",     category: "townsfolk", roleType: "townsfolk" },
+  { name: "廚師",       category: "townsfolk", roleType: "townsfolk" },
+  { name: "共情者",     category: "townsfolk", roleType: "townsfolk" },
+  { name: "占卜師",     category: "townsfolk", roleType: "townsfolk" },
+  { name: "送葬者",     category: "townsfolk", roleType: "townsfolk" },
+  { name: "僧侶",       category: "townsfolk", roleType: "townsfolk" },
+  { name: "渡鴉守看者", category: "townsfolk", roleType: "townsfolk" },
+  { name: "童貞之人",   category: "townsfolk", roleType: "townsfolk" },
+  { name: "殺手",       category: "townsfolk", roleType: "townsfolk" },
+  { name: "士兵",       category: "townsfolk", roleType: "townsfolk" },
+  { name: "市長",       category: "townsfolk", roleType: "townsfolk" }
+];
+
+
+
+window.onload = () => {
+    const roleList = document.getElementById("role-list");
+    const grouped = {
+      townsfolk: roles.filter(r => r.category === "townsfolk"),
+      outsider: roles.filter(r => r.category === "outsider"),
+      evil: roles.filter(r => r.category === "evil")
+    };
+  
+    const labels = {
+      townsfolk: "🟦 鎮民角色",
+      outsider: "🟨 外來者角色",
+      evil: "🟥 壞人角色（爪牙/惡魔)"
+    };
+  
+    Object.keys(grouped).forEach(cat => {
+      const col = document.createElement("div");
+      col.className = "category-column";
+      col.innerHTML = `<h4>${labels[cat]}</h4>`;
+  
+      grouped[cat].forEach(role => {
+        const div = document.createElement("div");
+        div.className = "role-option";
+      
+        if (role.name === "小惡魔") {
+          div.innerHTML = `<span class="role-name ${role.category}">${role.name}（必定有）</span>`;
+        } else {
+          div.innerHTML = `
+            <span class="role-name ${role.category}">${role.name}</span>
+            <div class="checkbox-row">
+                <input type="checkbox" class="force-role" /> <label>✅ 要有</label>
+            </div>
+            <div class="checkbox-row">
+                <input type="checkbox" class="ban-role" /> <label>🚫 唔玩</label>
+            </div>
+          `;
+        }
+      
+        div.dataset.role = role.name;
+        div.dataset.category = role.category;
+        col.appendChild(div);
+      });
+      
+      roleList.appendChild(col);
+    });
+  };
+  
+  function generate() {
+    const quotas = {
+      5:  { townsfolk: 3, outsider: 0, minion: 1, demon: 1 },
+      6:  { townsfolk: 3, outsider: 1, minion: 1, demon: 1 },
+      7:  { townsfolk: 5, outsider: 0, minion: 1, demon: 1 },
+      8:  { townsfolk: 5, outsider: 1, minion: 1, demon: 1 },
+      9:  { townsfolk: 5, outsider: 2, minion: 1, demon: 1 },
+      10: { townsfolk: 7, outsider: 0, minion: 2, demon: 1 },
+      11: { townsfolk: 7, outsider: 1, minion: 2, demon: 1 },
+      12: { townsfolk: 7, outsider: 2, minion: 2, demon: 1 },
+      13: { townsfolk: 9, outsider: 0, minion: 3, demon: 1 },
+      14: { townsfolk: 9, outsider: 1, minion: 3, demon: 1 },
+      15: { townsfolk: 9, outsider: 2, minion: 3, demon: 1 }
+    };
+  
+    const playerCount = parseInt(document.getElementById("playerCount").value, 10);
+    const target = quotas[playerCount];
+    if (!target) { alert("目前比例只支援 5–15 位玩家。"); return; }
+  
+    // 玩家名：先洗牌再派位（每次座位次序都會不同）
+    let playerList = document.getElementById('players').value
+      .trim().split('\n').map(s => s.trim()).filter(Boolean);
+    if (playerList.length === 0) {
+      playerList = Array.from({ length: playerCount }, (_, i) => `Player ${i + 1}`);
+    }
+    if (playerList.length !== playerCount) {
+      alert("玩家數目同名字數量唔一致。");
+      return;
+    }
+    const shuffledPlayers = [...playerList];
+    for (let i = shuffledPlayers.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffledPlayers[i], shuffledPlayers[j]] = [shuffledPlayers[j], shuffledPlayers[i]];
+    }
+  
+    // 讀取勾選
+    const forced = [];
+    const banned = new Set();
+    const pool   = [];
+    document.querySelectorAll("#role-list .role-option").forEach(div => {
+      const roleName = div.dataset.role;
+      const cat      = div.dataset.category;
+      const forceEl = div.querySelector(".force-role");
+      const banEl   = div.querySelector(".ban-role");
+      const must = forceEl ? forceEl.checked : false;
+      const ban  = banEl   ? banEl.checked   : false;
+      const obj = roles.find(r => r.name === roleName) || { name: roleName, category: cat };
+  
+      if (ban) banned.add(roleName);
+      else if (must) forced.push(obj);
+      else pool.push(obj);
+    });
+  
+    // 以 roleType 分組
+    const byType = { townsfolk: [], outsider: [], minion: [], demon: [] };
+    pool.forEach(r => { if (!banned.has(r.name)) byType[r.roleType].push(r); });
+  
+    const forcedByType = { townsfolk: 0, outsider: 0, minion: 0, demon: 0 };
+    forced.forEach(r => forcedByType[r.roleType]++);
+  
+    for (const k of Object.keys(target)) {
+      if (forcedByType[k] > target[k]) {
+        alert(`「要有」超出配額：${k} 需要 ${target[k]}，但你已強制 ${forcedByType[k]}`);
+        return;
+      }
+    }
+    if (target.demon !== 1) { alert("內置規則要求 Demon 一定係 1。"); return; }
+  
+    const takeRandom = (arr, n) => {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a.slice(0, n);
+    };
+  
+    const chosen = [...forced];
+  
+    // 需求
+    const need = {
+      townsfolk: target.townsfolk - forcedByType.townsfolk,
+      outsider:  target.outsider  - forcedByType.outsider,
+      minion:    target.minion    - forcedByType.minion,
+      demon:     target.demon     - forcedByType.demon
+    };
+  
+    // 先抽 Demon/Minion/Outsider
+    if (byType.minion.length < need.minion)   { alert("爪牙角色池不足。"); return; }
+    if (byType.outsider.length < need.outsider){ alert("外來者角色池不足。"); return; }
+    if (byType.demon.length   < need.demon)   { alert("惡魔角色池不足。"); return; }
+  
+    const chosenMinions   = takeRandom(byType.minion,  need.minion);
+    const chosenDemon     = takeRandom(byType.demon,   need.demon);
+    const chosenOutsiders = takeRandom(byType.outsider,need.outsider);
+  
+    chosen.push(...chosenMinions, ...chosenDemon, ...chosenOutsiders);
+  
+    // 有冇酒鬼？
+    const drunkChosen = chosen.some(r => r.isDrunk);
+  
+    // 鎮民「照抽齊」 target 數量（唔好 -1）
+    if (byType.townsfolk.length < need.townsfolk) { alert("鎮民角色池不足。"); return; }
+    const chosenTownsf = takeRandom(byType.townsfolk, need.townsfolk);
+    chosen.push(...chosenTownsf);
+  
+    // 如果有酒鬼：再額外從「未用嘅鎮民」攞一個做殼
+    let drunkCover = null;
+    if (drunkChosen) {
+      const usedTownsf = new Set(chosenTownsf.map(r => r.name));
+      forced.forEach(r => { if (r.roleType === "townsfolk") usedTownsf.add(r.name); });
+      const remainingTownsf = byType.townsfolk.filter(r => !usedTownsf.has(r.name));
+      if (remainingTownsf.length === 0) { alert("冇多餘嘅鎮民可以畀酒鬼做殼。"); return; }
+      drunkCover = takeRandom(remainingTownsf, 1)[0];
+  
+      // 改酒鬼顯示：如「占卜師(酒鬼)」
+      for (let i = 0; i < chosen.length; i++) {
+        if (chosen[i].isDrunk) {
+          chosen[i] = { name: `${drunkCover.name}(酒鬼)`, category: "outsider", roleType: "outsider" };
+          break;
+        }
+      }
+    }
+  
+    // 總數應該等於玩家數
+    if (chosen.length !== playerCount) {
+      alert(`抽取數量(${chosen.length}) ≠ 玩家數(${playerCount})，請檢查設定。`);
+      return;
+    }
+  
+    // 角色洗牌，配對已洗牌嘅玩家
+    const shuffledRoles = takeRandom(chosen, chosen.length);
+    const assignments = shuffledPlayers.map((name, i) => ({
+      seat: i + 1,
+      name,
+      role: shuffledRoles[i].name,
+      category: shuffledRoles[i].category
+    }));
+  
+    // Render
+    document.getElementById("mc-table").innerHTML = assignments
+      .map(p => `<tr class="${p.category}"><td>${p.seat}</td><td>${p.name}</td><td>${p.role}</td></tr>`)
+      .join('');
+    document.getElementById("player-table").innerHTML = assignments
+      .map(p => `<tr><td>${p.seat}</td><td>${p.name}</td></tr>`)
+      .join('');
+  
+    // 小惡魔可選 3 個鎮民 bluff（排除已用 + 酒鬼殼 + 被 ban）
+    const usedTownsfNames = new Set(chosenTownsf.map(r => r.name));
+    forced.forEach(r => { if (r.roleType === "townsfolk") usedTownsfNames.add(r.name); });
+    if (drunkCover) usedTownsfNames.add(drunkCover.name);
+  
+    const allTownsf = roles.filter(r => r.roleType === "townsfolk")
+                           .filter(r => !usedTownsfNames.has(r.name));
+    const bluffs = takeRandom(allTownsf, Math.min(3, allTownsf.length)).map(r => r.name);
+    document.getElementById("bluff-box").innerHTML =
+      `<strong>小惡魔可選鎮民（3 選）：</strong> ${bluffs.join("、")}`;
+  
+    switchView();
+  }
+  
+  
+  
+  
+  function switchView() {
+    const view = document.querySelector('input[name="view"]:checked').value;
+    document.getElementById("mc-view").style.display = view === "mc" ? "block" : "none";
+    document.getElementById("player-view").style.display = view === "player" ? "block" : "none";
+  }
+
+</script>
+</body>
+</html>
